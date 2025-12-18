@@ -125,10 +125,6 @@ async def get_ai_action_plan(html_snippet, user_data):
     """
 
     try:
-        # Debug: Save HTML to file
-        with open("debug_form.html", "w") as f:
-            f.write(html_snippet)
-            
         completion = await client.chat.completions.create(
             model=MODEL,
             messages=[
