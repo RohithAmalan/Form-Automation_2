@@ -22,11 +22,17 @@ This project automates form submission using **Playwright** for browser control 
     Update `form_data.json` with the entries you want to submit.
 
 2.  **Run Automation**:
-    ```bash
-    python3 main.py
-    ```
+    *   **Option A: Custom Iterative Agent (Recommended)** - Uses `user_profile.json` to fill multiple forms in `form_urls.json`.
+        ```bash
+        python3 main.py
+        ```
+    *   **Option B: Hybrid Script (Legacy)** - Uses the original implementation.
+        ```bash
+        python3 main.py
+        ```
 
 ## Structure
-- `main.py`: Core automation logic (Hybrid Playwright + LLM).
+- `main_browser_use.py`: **New** iterative agent implementation using `browser-use`.
+- `main.py`: Original automation logic (Hybrid Playwright + LLM).
 - `form_data.json`: Data source for bulk processing.
 - `requirements.txt`: Python package dependencies.
