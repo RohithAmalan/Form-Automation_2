@@ -1,8 +1,12 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #0f172a;
+  /* Slate 900 */
+  --foreground: #f8fafc;
+  /* Slate 50 */
+  --primary: #3b82f6;
+  /* Blue 500 */
 }
 
 @theme inline {
@@ -12,15 +16,113 @@
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
+/* Force Dark Mode */
+@media (prefers-color-scheme: light) {
   :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+    --background: #0f172a;
+    --foreground: #f8fafc;
   }
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background-color: #0f172a !important;
+  /* Force Dark Slate */
+  background-image:
+    radial-gradient(circle at 15% 50%, rgba(124, 58, 237, 0.15) 0%, transparent 50%),
+    /* Purple Glow (Left) */
+    radial-gradient(circle at 85% 30%, rgba(59, 130, 246, 0.1) 0%, transparent 50%);
+  /* Blue Glow (Right) */
+  /* Purple Glow */
+  background-size: 100% 100%;
+  color: #f8fafc;
+  font-family: var(--font-geist-sans), sans-serif;
+  min-height: 100vh;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* 
+  DARK GLASSMOPRHISM UTILITIES
+*/
+
+.glass-panel {
+  background: rgba(30, 41, 59, 0.4);
+  /* Slate 800 transparent */
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  /* White subtle border */
+  border-radius: 1rem;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3);
+  /* Dark shadow */
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.glass-panel:hover {
+  background: rgba(30, 41, 59, 0.6);
+  border-color: rgba(255, 255, 255, 0.15);
+  transform: translateY(-2px);
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5);
+}
+
+.sidebar-panel {
+  background: rgba(15, 23, 42, 0.95);
+  /* Deep Slate */
+  backdrop-filter: blur(20px);
+  border-right: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.glass-input {
+  background: rgba(15, 23, 42, 0.5);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: #f8fafc;
+  border-radius: 0.75rem;
+  transition: all 0.2s ease;
+}
+
+.glass-input:focus {
+  background: rgba(15, 23, 42, 0.8);
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2);
+  outline: none;
+}
+
+/* Animations */
+.animate-in {
+  animation: fadeIn 0.5s ease-out forwards;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #0f172a;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #334155;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #475569;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.1);
 }

@@ -30,14 +30,27 @@ const upload = multer({ storage: storage });
 // Profiles
 router.get('/profiles', FormController.getProfiles);
 router.post('/profiles', FormController.createProfile);
+router.put('/profiles/:id', FormController.updateProfile);
+router.delete('/profiles/:id', FormController.deleteProfile);
 
 // Jobs
 router.get('/jobs', FormController.getJobs);
 router.post('/jobs', upload.single('file'), FormController.createJob);
 router.delete('/jobs/:id', FormController.deleteJob);
+router.delete('/jobs', FormController.deleteAllJobs); // New Route
 router.post('/jobs/:id/resume', upload.single('file'), FormController.resumeJob);
+// Logs - Moved to top
+console.log("Registering /logs route (TOP)");
+router.get('/logs', (req, res) => {
+    console.log("Hit /logs (Inline)");
+    FormController.getSystemLogs(req, res);
+});
 
 // Logs
+// router.get('/logs', ...); // MOVED
 router.get('/jobs/:id/logs', FormController.getJobLogs);
+
+// Settings
+router.get('/settings/health', FormController.getSystemHealth);
 
 export default router;

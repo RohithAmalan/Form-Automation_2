@@ -11,11 +11,11 @@ const pool = new Pool({
 
 async function updateProfile() {
     try {
-        const jsonPath = path.join(__dirname, '../../../profile_data.json');
+        const jsonPath = path.join(__dirname, '../../../database/profile_data.json');
 
         if (!fs.existsSync(jsonPath)) {
             console.error(`❌ File not found: ${jsonPath}`);
-            console.error("Please create 'profile_data.json' in the project root first.");
+            console.error("Please ensure 'database/profile_data.json' exists.");
             process.exit(1);
         }
 

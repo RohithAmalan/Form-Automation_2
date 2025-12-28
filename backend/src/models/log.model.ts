@@ -14,5 +14,16 @@ export const LogModel = {
             `INSERT INTO logs (job_id, action_type, message, details) VALUES ($1, $2, $3, $4)`,
             [jobId, type, message, details]
         );
+    },
+
+    getAll: async () => {
+        const result = await pool.query(`
+            SELECT logs.*, jobs.form_name 
+            FROM logs 
+            LEFT JOIN jobs ON logs.job_id = jobs.id 
+            ORDER BY logs.timestamp DESC 
+            LIMIT 200
+        `);
+        return result.rows;
     }
 };

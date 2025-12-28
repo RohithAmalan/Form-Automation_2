@@ -17,5 +17,17 @@ export const ProfileModel = {
             [name, payload]
         );
         return result.rows[0];
+    },
+
+    update: async (id: string, name: string, payload: any) => {
+        const result = await pool.query(
+            'UPDATE profiles SET name = $1, payload = $2 WHERE id = $3 RETURNING *',
+            [name, payload, id]
+        );
+        return result.rows[0];
+    },
+
+    delete: async (id: string) => {
+        await pool.query('DELETE FROM profiles WHERE id = $1', [id]);
     }
 };

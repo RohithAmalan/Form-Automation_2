@@ -5,6 +5,8 @@ A robust, AI-powered form automation agent featuring **Human-in-the-Loop (HITL)*
 ## 🚀 Key Features
 
 *   **Human-in-the-Loop (HITL)**: Intelligently pauses when data is missing (e.g., File Uploads, specific text fields) and waits for user input via the dashboard.
+*   **🧠 Profile Learning (New)**: Automatically learns from your inputs. If you provide information once (e.g., "Address Line 2"), it saves it to your profile and never asks again.
+*   **⏱️ Execution Timer (New)**: Tracks the precise working duration of each agent, displayed live on the dashboard.
 *   **Smart Profile Management**: Automatically mapping user data (Name, Address, Experience) to various form layouts.
 *   **Custom Data Override**: Job-specific data (`{"City": "Paris"}`) overrides default profile data.
 *   **Resume Capability**: Seamlessly resume jobs after providing missing info.

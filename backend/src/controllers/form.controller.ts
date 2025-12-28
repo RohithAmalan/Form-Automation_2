@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import { JobModel } from '../models/job.model';
 import { ProfileModel } from '../models/profile.model';
 import { LogModel } from '../models/log.model';
+import pool from '../config/db'; // Import pool for health check
 
 export const FormController = {
     // --- Profiles ---
@@ -20,6 +21,27 @@ export const FormController = {
         try {
             const profile = await ProfileModel.create(name, payload);
             res.json(profile);
+        } catch (err: any) {
+            console.error(err);
+            res.status(500).json({ error: err.message });
+        }
+    },
+
+    updateProfile: async (req: Request, res: Response) => {
+        const { name, payload } = req.body;
+        try {
+            const profile = await ProfileModel.update(req.params.id, name, payload);
+            res.json(profile);
+        } catch (err: any) {
+            console.error(err);
+            res.status(500).json({ error: err.message });
+        }
+    },
+
+    deleteProfile: async (req: Request, res: Response) => {
+        try {
+            await ProfileModel.delete(req.params.id);
+            res.json({ message: 'Deleted successfully' });
         } catch (err: any) {
             console.error(err);
             res.status(500).json({ error: err.message });
@@ -193,6 +215,52 @@ export const FormController = {
         try {
             const logs = await LogModel.getByJobId(req.params.id);
             res.json(logs);
+        } catch (err: any) {
+            console.error(err);
+            res.status(500).json({ error: err.message });
+        }
+    },
+
+    getSystemLogs: async (req: Request, res: Response) => {
+        try {
+            const logs = await LogModel.getAll();
+            res.json(logs);
+        } catch (err: any) {
+            console.error(err);
+            res.status(500).json({ error: err.message });
+        }
+    },
+
+    // --- Settings / System ---
+    getSystemHealth: async (req: Request, res: Response) => {
+        try {
+            // Check DB
+            await pool.query('SELECT 1');
+            const dbStatus = 'connected';
+
+            // Check AI
+            const apiKey = process.env.OPENROUTER_API_KEY || process.env.OPENAI_API_KEY;
+            const aiStatus = apiKey ? (apiKey.startsWith('sk-') ? 'configured' : 'configured (custom)') : 'missing';
+
+            res.json({
+                db: dbStatus,
+                ai: aiStatus,
+                worker: 'running', // Worker is in-process, so if API is up, Worker thread is likely up.
+                version: '1.0.0'
+            });
+        } catch (err: any) {
+            res.status(500).json({
+                db: 'disconnected',
+                ai: 'unknown',
+                error: err.message
+            });
+        }
+    },
+
+    deleteAllJobs: async (req: Request, res: Response) => {
+        try {
+            await JobModel.deleteAll();
+            res.json({ message: 'All data cleared successfully.' });
         } catch (err: any) {
             console.error(err);
             res.status(500).json({ error: err.message });

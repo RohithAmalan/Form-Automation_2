@@ -7,9 +7,19 @@ import * as cheerio from 'cheerio';
 
 dotenv.config({ path: path.join(__dirname, '../../../.env') });
 
+const apiKey = process.env.OPENROUTER_API_KEY;
+console.log(`[PlaywrightRunner] Init OpenAI. Key Present: ${!!apiKey}, Length: ${apiKey?.length}`);
+if (apiKey) {
+    console.log(`[PlaywrightRunner] Key Start: ${apiKey.substring(0, 5)}...`);
+}
+
 const openai = new OpenAI({
-    apiKey: process.env.OPENROUTER_API_KEY,
+    apiKey: apiKey,
     baseURL: "https://openrouter.ai/api/v1",
+    defaultHeaders: {
+        "HTTP-Referer": "http://localhost:3000",
+        "X-Title": "FormAutomation",
+    }
 });
 
 const MODEL = "openai/gpt-4o-mini";
@@ -109,6 +119,25 @@ async function setMissingFieldInfo(jobId: string, type: 'file' | 'text', label: 
     await pool.query("UPDATE jobs SET custom_data = $1 WHERE id = $2", [newData, jobId]);
 }
 
+// Helper to SAVE learned data to Profile
+async function saveLearnedData(profileId: string, key: string, value: string) {
+    if (!profileId || !key || !value) return;
+    try {
+        // Fetch current payload
+        const res = await pool.query("SELECT payload FROM profiles WHERE id = $1", [profileId]);
+        if (res.rows.length === 0) return;
+
+        const currentPayload = res.rows[0].payload || {};
+        // Merge new data
+        const newPayload = { ...currentPayload, [key]: value };
+
+        await pool.query("UPDATE profiles SET payload = $1, updated_at = NOW() WHERE id = $2", [newPayload, profileId]);
+        console.log(`🧠 Learned new data for '${key}': ${value.substring(0, 20)}...`);
+    } catch (e) {
+        console.error("Failed to save learned data:", e);
+    }
+}
+
 async function waitForResume(jobId: string, missingType: 'file' | 'text', missingLabel: string): Promise<string | null> {
     console.log(`⏸️ Job ${jobId} PAUSED. Waiting for user input (${missingType}): ${missingLabel}`);
 
@@ -157,7 +186,7 @@ async function waitForResume(jobId: string, missingType: 'file' | 'text', missin
 async function getAiActionPlan(html: string, profileData: any): Promise<Action[]> {
     // Explicitly check if a file path is present in the profile data
     const hasFile = profileData.uploaded_file_path ? true : false;
-    const filePathInfo = hasFile ? `File to upload is available at: "${profileData.uploaded_file_path}". Look for <input type="file">.` : "No file upload required.";
+    const filePathInfo = hasFile ? `File to upload is available at: "${profileData.uploaded_file_path}". Look for <input type="file">.` : "No file path provided in profile. If <input type='file'> exists, you MUST ask the user for it.";
 
     const prompt = `
     You are an expert browser automation agent.
@@ -174,14 +203,16 @@ async function getAiActionPlan(html: string, profileData: any): Promise<Action[]
     \`\`\`
 
     REQUIREMENTS:
-    1. Return strictly a JSON list. No markdown formatting.
+    1. Return strictly a valid JSON Object. No markdown formatting.
     2. Example format:
-       [
-           {"selector": "#name", "value": "John", "type": "fill"},
-           {"selector": "input[type='file']", "value": "/path/to/file.pdf", "type": "upload"},
-           {"selector": "#submit", "type": "click"},
-           {"selector": "field_label", "value": "Question for user?", "type": "ask_user"}
-       ]
+       {
+         "actions": [
+            {"selector": "#name", "value": "John", "type": "fill"},
+            {"selector": "input[type='file']", "value": "/path/to/file.pdf", "type": "upload"},
+            {"selector": "#submit", "type": "click"},
+            {"selector": "field_label", "value": "Question for user?", "type": "ask_user"}
+         ]
+       }
     3. Use 'fill' to input text.
     4. For dropdowns (<select>):
        - Use 'fill' type.
@@ -191,17 +222,25 @@ async function getAiActionPlan(html: string, profileData: any): Promise<Action[]
        - Use type 'upload'.
        - The 'value' MUST be: "${profileData.uploaded_file_path || ''}".
     7. CRITICAL: Find the 'Submit' button and \`click\` it as the VERY LAST action.
+
+    8. SPECIAL INSTRUCTION FOR DATES:
+       - The profile data includes keys: "current_date" (YYYY-MM-DD), "current_day", "current_year".
+       - If you see a field asking for "Today's Date", "Date", or similar, USE these values!
+       - DO NOT ask the user for the date if you can infer it from these keys.
+       - If the field expects a specific format (e.g. MM/DD/YYYY), convert "current_date" accordingly.
     
-    8. MISSING DATA STRATEGY (HUMAN-IN-THE-LOOP):
-       - If a visible, required field (<input>, <select>, <textarea>) needs a value (e.g. "Proposal Title", "Date"):
-       - Check the provided profileData.
-       - If the key is missing OR the value is an empty string ("") OR null:
-         -> CREATE an action with type "ask_user".
-         -> "target_selector": The CSS SELECTOR of the input field (e.g. "#proposal_title").
-         -> "question_label": The HUMAN-READABLE text label (e.g. "Proposal Title"). DO NOT use CSS selectors here.
-       - DO NOT hallucinate a value.
-       - DO NOT skip it.
-       - NOTE: Only do this for *required* fields that are truly missing.
+    9. MISSING DATA STRATEGY (HUMAN-IN-THE-LOOP):
+       - YOUR GOAL IS TO FILL **EVERY** VISIBLE FIELD, NOT JUST REQUIRED ONES.
+       - If a visible field (<input>, <select>, <textarea>) needs a value:
+         -> Check the provided profileData.
+         -> If the key is missing OR the value is empty:
+            -> CREATE an action with type "ask_user".
+            -> "target_selector": The CSS SELECTOR of the input field.
+            -> "question_label": The HUMAN-READABLE text label.
+       - FOR FILE UPLOADS:
+         - If <input type="file"> exists and profileData.uploaded_file_path is missing/empty:
+         - YOU MUST GENERATE type "upload" with value "". This will trigger the system to pause and ask the user.
+       - Do not skip "Address Line 2" or other optional fields if they are visible.
     `;
 
     try {
@@ -211,7 +250,8 @@ async function getAiActionPlan(html: string, profileData: any): Promise<Action[]
                 { role: "system", content: "You are a helpful automation assistant returning raw JSON." },
                 { role: "user", content: prompt }
             ],
-            response_format: { type: "json_object" }
+            response_format: { type: "json_object" },
+            max_tokens: 3000
         });
 
         let content = completion.choices[0].message.content || "{}";
@@ -254,6 +294,20 @@ async function getAiActionPlan(html: string, profileData: any): Promise<Action[]
  */
 export async function processJob(url: string, profileData: any, logger: AutomationLogger) {
     // console.log(`Processing Job for ${url}`); // Optional local log
+
+    // VITALITY CHECK
+    try {
+        await logger.log('Testing AI connection...', 'info');
+        await openai.chat.completions.create({
+            model: "openai/gpt-3.5-turbo", // Use cheap model for ping
+            messages: [{ role: "user", content: "ping" }],
+            max_tokens: 5
+        });
+        await logger.log('AI Connection Valid', 'success');
+    } catch (e: any) {
+        await logger.log(`AI Connection Failed: ${e.message}`, 'error');
+        throw e; // Fail early
+    }
 
     const browser = await chromium.launch({ headless: false }); // Visible for demo
     const context = await browser.newContext();
@@ -469,6 +523,22 @@ export async function processJob(url: string, profileData: any, logger: Automati
                     const userResponse = await waitForResume(profileData.job_id, 'text', labelEncoded);
 
                     if (userResponse) {
+                        // --- LEARNING MOMENT (FIX) ---
+                        if (profileData.profile_id) {
+                            // STRATEGY: 
+                            // 1. Save using the specific question asked (current behavior).
+                            // 2. ALSO save using the 'selector' if it looks like a clean ID, as a fallback backup.
+
+                            await saveLearnedData(profileData.profile_id, labelEncoded, userResponse);
+
+                            // If labelEncoded was just a long natural question, try to save a cleaner key if we have the selector?
+                            // This is complex without knowing the field name. 
+                            // Ideally, we'd use the 'missing_label' passed to waitForResume.
+
+                            await logger.log(`Saved "${labelEncoded}" to your profile for future use.`, 'success');
+                        }
+                        // -----------------------------
+
                         await logger.log(`User provided: "${userResponse}"`, 'success');
 
                         // NOW, we need to fill this into the form. 
@@ -575,7 +645,7 @@ export async function processJob(url: string, profileData: any, logger: Automati
             }
         }
 
-        // --- VALIDATION STEP ---
+        // --- VALIDATION & RECOVERY STEP ---
         await logger.log("Validating form completeness...", "info");
         const validationPrompt = `
         You are a QA Agent.
@@ -588,33 +658,80 @@ export async function processJob(url: string, profileData: any, logger: Automati
         Identify any <input>, <select>, or <textarea> that:
         1. Is visible
         2. Is NOT readonly/disabled
-        3. Is marked 'required' or has 'aria-required="true"'
-        4. Has an empty value
+        3. Has an empty value (or no file selected for file inputs)
+        4. Appears to be a meaningful field (e.g. "Address Line 2", "Upload Document", "Comments")
+        5. IGNORE hidden fields, search bars, or insignificant UI elements.
+        
+        CRITICAL: The 'label' MUST be the visible text on the screen (e.g. "Street Address", "Resume"), NOT the ID or Selector (e.g. #input_123).
         
         OUTPUT:
-        Return a JSON list of logical names (labels) of these missing fields. 
-        Example: ["First Name", "Email Address"]
-        If none, return [].
+        Return a JSON list of objects describing missing fields:
+        {
+            "missing_fields": [
+                { "label": "Address Line 2", "selector": "#addr2", "type": "text" },
+                { "label": "Upload Resume", "selector": "input[type='file']", "type": "file" }
+            ]
+        }
         `;
 
         try {
             const valCompletion = await openai.chat.completions.create({
                 model: MODEL,
                 messages: [{ role: "user", content: validationPrompt }],
-                response_format: { type: "json_object" }
+                response_format: { type: "json_object" },
+                max_tokens: 1000
             });
             const valContent = valCompletion.choices[0].message.content || "{}";
-            const missingFields = JSON.parse(valContent).missing_fields || JSON.parse(valContent).fields || []; // Robust parsing
+            const valData = JSON.parse(valContent);
+            const missingFields = valData.missing_fields || [];
 
             if (Array.isArray(missingFields) && missingFields.length > 0) {
+                await logger.log(`Found ${missingFields.length} unfilled fields. Asking user...`, 'warning');
+
                 for (const field of missingFields) {
-                    await logger.log(`⚠️ Potential missing required field: "${field}"`, 'warning');
+                    // Check if it's really empty/meaningful by asking for User Input
+                    // We reuse the existing flow: ask user, then fill.
+                    const label = field.label || "Unfilled Field";
+                    const type = field.type === 'file' ? 'file' : 'text';
+                    const selector = field.selector;
+
+                    if (type === 'file') {
+                        await logger.log(`Asking user for missing file: ${label}`, 'warning');
+                        const newPath = await waitForResume(profileData.job_id, 'file', label);
+                        if (newPath) {
+                            if (fs.existsSync(path.resolve(newPath))) {
+                                await page.setInputFiles(selector, path.resolve(newPath)).catch(() => { });
+                                await logger.log(`Uploaded late-provided file: ${label}`, 'success');
+                            }
+                        }
+                    } else {
+                        await logger.log(`Asking user for missing text: ${label}`, 'warning');
+                        const resp = await waitForResume(profileData.job_id, 'text', label);
+                        if (resp) {
+                            // --- LEARNING MOMENT ---
+                            if (profileData.profile_id) {
+                                await saveLearnedData(profileData.profile_id, label, resp);
+                                await logger.log(`Saved "${label}" to your profile for future use.`, 'success');
+                            }
+                            // -----------------------
+
+                            // Attempt to fill using BEST EFFORT
+                            try {
+                                await page.fill(selector, resp);
+                                await logger.log(`Filled ${label} with user input`, 'success');
+                            } catch (e) {
+                                // Fallback: try by label?
+                                await logger.log(`Could not auto-fill ${selector}. Please fill manually if needed.`, 'warning');
+                            }
+                        }
+                    }
                 }
+
             } else {
-                await logger.log("Validation passed. All required fields appear filled.", "info");
+                await logger.log("Validation passed. All relevant fields appear filled.", "info");
             }
-        } catch (e) {
-            await logger.log("Validation check failed (non-critical)", 'warning');
+        } catch (e: any) {
+            await logger.log(`Validation/Recovery failed: ${e.message}`, 'warning');
         }
         // --- END VALIDATION ---
 

@@ -1,21 +1,46 @@
+import './prelude'; // MUST BE FIRST
 import express from 'express';
 import cors from 'cors';
-import dotenv from 'dotenv';
-import path from 'path';
 import formRoutes from './routes/form.routes';
 import { JobModel } from './models/job.model';
+import { LogModel } from './models/log.model'; // Import at top
 import { runWorker } from './queue/taskQueue';
 
-// Validates .env load
-dotenv.config({ path: path.join(__dirname, '../../.env') });
+console.log("SERVER VERSION: 2000 - DEBUG");
+
+import session from 'express-session';
+import pgSession from 'connect-pg-simple';
+import passport from './auth/passport';
+import authRoutes from './routes/auth.routes';
+import pool from './config/db';
+
+// ... (previous imports)
 
 const app = express();
 const PORT = process.env.PORT || 3001;
+const PgStore = pgSession(session);
 
-app.use(cors());
+// --- SESSION & PASSPORT ---
+app.use(session({
+  store: new PgStore({
+    pool: pool,
+    tableName: 'session'
+  }),
+  secret: process.env.SESSION_SECRET || 'dev_secret',
+  resave: false,
+  saveUninitialized: false,
+  cookie: { maxAge: 30 * 24 * 60 * 60 * 1000 } // 30 days
+}));
+
+app.use(passport.initialize());
+app.use(passport.session());
+// --------------------------
+
+app.use(cors({ origin: 'http://localhost:3000', credentials: true })); // Update CORS
 app.use(express.json());
 
 // Mount Routes
+app.use('/auth', authRoutes); // Auth Routes
 app.use('/', formRoutes);
 
 app.get('/health', (req, res) => {
@@ -45,7 +70,6 @@ app.get('/test-form', (req, res) => {
 app.listen(PORT, async () => {
   console.log(`Server running on port ${PORT}`);
 
-  // Crash Recovery
   try {
     const count = await JobModel.failStuckJobs();
     if (count && count > 0) {

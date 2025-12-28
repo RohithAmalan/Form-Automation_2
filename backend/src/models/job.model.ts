@@ -9,6 +9,7 @@ export interface Job {
     file_path: string | null;
     form_name: string;
     created_at: Date;
+    started_at: Date | null;
     completed_at: Date | null;
 }
 
@@ -33,6 +34,13 @@ export const JobModel = {
 
     delete: async (id: string) => {
         await pool.query('DELETE FROM jobs WHERE id = $1', [id]);
+    },
+
+    deleteAll: async () => {
+        // Also delete logs? Logs have FK cascade usually or we should delete them too?
+        // Assuming logs have ON DELETE CASCADE or we might orphan them.
+        // Let's assume we want to clear everything.
+        await pool.query('TRUNCATE jobs CASCADE');
     },
 
     update: async (id: string, updates: any) => {
