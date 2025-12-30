@@ -1,20 +1,16 @@
 import './prelude'; // MUST BE FIRST
 import express from 'express';
 import cors from 'cors';
-import formRoutes from './routes/form.routes';
-import { JobModel } from './models/job.model';
-import { LogModel } from './models/log.model'; // Import at top
-import { runWorker } from './queue/taskQueue';
-
-console.log("SERVER VERSION: 2000 - DEBUG");
-
 import session from 'express-session';
 import pgSession from 'connect-pg-simple';
 import passport from './auth/passport';
 import authRoutes from './routes/auth.routes';
+import formRoutes from './routes/form.routes';
+import templateRoutes from './routes/template.routes';
+import { JobModel } from './models/job.model';
+import { LogModel } from './models/log.model';
+import { runWorker } from './queue/taskQueue';
 import pool from './config/db';
-
-// ... (previous imports)
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -36,12 +32,12 @@ app.use(passport.initialize());
 app.use(passport.session());
 // --------------------------
 
-app.use(cors({ origin: 'http://localhost:3000', credentials: true })); // Update CORS
+app.use(cors({
+  origin: ['http://localhost:3000', 'http://127.0.0.1:3000'],
+  credentials: true
+})); // Update CORS
 app.use(express.json());
 
-import templateRoutes from './routes/template.routes';
-
-// ... (previous imports)
 
 // Mount Routes
 app.use('/auth', authRoutes); // Auth Routes

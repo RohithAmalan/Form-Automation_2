@@ -5,8 +5,7 @@ export interface LogEntry {
     job_id: string;
     action_type: 'info' | 'error' | 'action' | 'warning' | 'success';
     message: string;
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    details?: any;
+    details?: unknown;
     timestamp: string;
 }
 
@@ -67,7 +66,7 @@ export default function LogTimeline({ logs }: { logs: LogEntry[] }) {
                                 {log.message}
                             </p>
 
-                            {log.details && (
+                            {!!log.details && (
                                 <div className="mt-3">
                                     <details className="group/details">
                                         <summary className="text-[10px] text-gray-500 cursor-pointer hover:text-white flex items-center gap-1 select-none">

@@ -1,0 +1,61 @@
+"use client";
+
+import { useState, useEffect } from "react";
+import LogTimeline, { LogEntry } from "../../components/LogTimeline";
+
+const SERVER_URL = "http://localhost:3001";
+
+export default function SystemLogsPage() {
+    const [logs, setLogs] = useState<LogEntry[]>([]);
+    const [loading, setLoading] = useState(true);
+
+    const fetchLogs = () => {
+        fetch(`${SERVER_URL}/logs`)
+            .then((res) => res.json())
+            .then((data) => {
+                setLogs(data);
+                setLoading(false);
+            })
+            .catch((err) => console.error("Failed to fetch logs:", err));
+    };
+
+    useEffect(() => {
+        fetchLogs();
+        const interval = setInterval(fetchLogs, 3000); // Poll frequently
+        return () => clearInterval(interval);
+    }, []);
+
+    return (
+        <div className="animate-in fade-in duration-500 max-w-4xl mx-auto">
+            <div className="flex justify-between items-end mb-8">
+                <div>
+                    <h1 className="text-3xl font-bold text-white mb-2">Global System Logs</h1>
+                    <p className="text-gray-400">Real-time stream of all agent activities across all jobs.</p>
+                </div>
+                <div className="flex gap-2">
+                    <span className="flex items-center gap-2 px-3 py-1 rounded-full bg-blue-500/10 text-blue-300 text-xs border border-blue-500/20">
+                        <span className="w-2 h-2 rounded-full bg-blue-400 animate-pulse"></span>
+                        Live Polling
+                    </span>
+                </div>
+            </div>
+
+            <div className="glass-panel p-8 rounded-2xl border border-white/10 shadow-2xl min-h-[600px] relative">
+                {/* Enhance the LogTimeline to show Job Names if available? 
+             My LogTimeline component currently only shows message/type. 
+             Ideally I should tweak LogTimeline to show 'form_name' if available.
+             But for now, the message usually contains context or I can rely on the user knowing what's running.
+          */}
+
+                {loading ? (
+                    <div className="flex flex-col items-center justify-center h-40 space-y-4">
+                        <div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+                        <p className="text-gray-400">Connecting to Log Stream...</p>
+                    </div>
+                ) : (
+                    <LogTimeline logs={logs} />
+                )}
+            </div>
+        </div>
+    );
+}

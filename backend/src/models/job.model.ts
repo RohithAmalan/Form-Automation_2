@@ -56,7 +56,7 @@ export const JobModel = {
     // Used by TaskQueue mainly
     getPending: async () => {
         return pool.query(`
-            SELECT id FROM jobs WHERE status = 'PENDING' ORDER BY created_at ASC FOR UPDATE SKIP LOCKED LIMIT 1
+            SELECT * FROM jobs WHERE status = 'PENDING' ORDER BY created_at ASC FOR UPDATE SKIP LOCKED LIMIT 1
         `);
     },
 

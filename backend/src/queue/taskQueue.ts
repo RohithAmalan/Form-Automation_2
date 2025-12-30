@@ -70,7 +70,7 @@ export const runWorker = async () => {
 
             const logger: AutomationLogger = {
                 log: async (message, type = 'info', metadata) => {
-                    await LogModel.create(job.id, message, type as any, metadata);
+                    await LogModel.create(job.id, type, message, metadata);
                     console.log(`[Job ${job.id}] [${type.toUpperCase()}] ${message}`);
                 }
             };
