@@ -6,9 +6,10 @@ export interface Job {
     status: string;
     profile_id: string;
     custom_data: any;
-    file_path: string | null;
+    file_path?: string | null;
+    retries?: number;
     form_name: string;
-    created_at: Date;
+    created_at?: Date;
     started_at: Date | null;
     completed_at: Date | null;
 }

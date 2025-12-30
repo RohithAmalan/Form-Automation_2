@@ -19,7 +19,8 @@ CREATE TABLE IF NOT EXISTS jobs (
     custom_data JSONB,
     file_path TEXT,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    completed_at TIMESTAMP WITH TIME ZONE
+    completed_at TIMESTAMP WITH TIME ZONE,
+    retries INT DEFAULT 0
 );
 
 -- Table: logs

@@ -127,7 +127,7 @@ export const runWorker = async () => {
                             await logger.log("▶️ Job Manually Resumed!", "success");
                             break;
                         }
-                        if (cur === 'FAILED' || cur === 'COMPLETED') throw new Error(`Job stopped while paused (Status: ${cur})`);
+                        if (cur === 'FAILED' || cur === 'COMPLETED' || cur === 'DEAD' || cur === 'CANCELLED') throw new Error(`Job stopped (Status: ${cur})`);
                     }
                 }
             };
@@ -162,7 +162,7 @@ export const runWorker = async () => {
                         if (curJob.custom_data && curJob.custom_data.user_response) return curJob.custom_data.user_response;
                         return null; // Fallback
                     }
-                    if (curJob.status === 'FAILED') return null;
+                    if (['FAILED', 'DEAD', 'CANCELLED', 'COMPLETED'].includes(curJob.status)) return null;
                 }
                 return null;
             };
@@ -195,8 +195,21 @@ export const runWorker = async () => {
                 await pool.query(`UPDATE jobs SET status = 'COMPLETED', completed_at = NOW() WHERE id = $1`, [job.id]);
                 console.log(`✅ Job ${job.id} Completed`);
             } catch (err: any) {
-                await pool.query(`UPDATE jobs SET status = 'FAILED', completed_at = NOW() WHERE id = $1`, [job.id]);
-                console.error(`❌ Job ${job.id} Failed:`, err);
+                const MAX_RETRIES = 1;
+                const currentRetries = (job as any).retries || 0;
+
+                if (currentRetries < MAX_RETRIES) {
+                    await pool.query(
+                        "UPDATE jobs SET status = 'PENDING', retries = COALESCE(retries, 0) + 1 WHERE id = $1",
+                        [job.id]
+                    );
+                    await LogModel.create(job.id, 'warning', `Job Failed. Retrying (${currentRetries + 1}/${MAX_RETRIES})...`, { error: err.message });
+                    console.log(`⚠️ Job ${job.id} Failed. Retrying...`);
+                } else {
+                    await pool.query(`UPDATE jobs SET status = 'DEAD', completed_at = NOW() WHERE id = $1`, [job.id]);
+                    console.error(`❌ Job ${job.id} Dead:`, err);
+                    await LogModel.create(job.id, 'error', `Job Failed Permanently (Dead)`, { error: err.message, stack: err.stack });
+                }
             }
 
         } catch (err) {

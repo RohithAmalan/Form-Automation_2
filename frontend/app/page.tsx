@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import LogTimeline, { LogEntry } from "../components/LogTimeline";
+import LogTable from "../components/LogTable";
 
 const SERVER_URL = "http://localhost:3001";
 
@@ -23,6 +24,7 @@ export default function DashboardPage() {
   const [jobs, setJobs] = useState<Job[]>([]);
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [showLogs, setShowLogs] = useState(false);
+  const [viewMode, setViewMode] = useState<'timeline' | 'table'>('timeline');
   const [initialLoading, setInitialLoading] = useState(true);
 
   // Resume State
@@ -82,6 +84,7 @@ export default function DashboardPage() {
   const viewLogs = async (jobId: string) => {
     setShowLogs(true);
     setLogs([]);
+    setViewMode('timeline');
     try {
       const res = await fetch(`${SERVER_URL}/jobs/${jobId}/logs`, { credentials: 'include' });
       const data = await res.json();
@@ -351,7 +354,7 @@ export default function DashboardPage() {
       {/* Logs Modal */}
       {showLogs && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center p-4 z-[100] animate-in fade-in duration-200">
-          <div className="glass-panel w-full max-w-3xl max-h-[85vh] flex flex-col rounded-2xl overflow-hidden shadow-2xl border border-white/10">
+          <div className="glass-panel w-full max-w-4xl max-h-[85vh] flex flex-col rounded-2xl overflow-hidden shadow-2xl border border-white/10">
             <div className="p-4 border-b border-white/10 flex justify-between items-center bg-white/5">
               <div className="flex items-center gap-3">
                 <div className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse border-2 border-slate-900 ring-1 ring-emerald-500/50"></div>
@@ -359,6 +362,22 @@ export default function DashboardPage() {
                   <h3 className="font-bold text-white text-sm">Agent Live Stream</h3>
                 </div>
               </div>
+
+              <div className="flex bg-black/40 rounded-lg p-1 border border-white/5">
+                <button
+                  onClick={() => setViewMode('timeline')}
+                  className={`px-3 py-1 text-xs font-bold rounded-md transition-all ${viewMode === 'timeline' ? 'bg-blue-600 text-white shadow-lg' : 'text-slate-400 hover:text-white'}`}
+                >
+                  Timeline
+                </button>
+                <button
+                  onClick={() => setViewMode('table')}
+                  className={`px-3 py-1 text-xs font-bold rounded-md transition-all ${viewMode === 'table' ? 'bg-blue-600 text-white shadow-lg' : 'text-slate-400 hover:text-white'}`}
+                >
+                  Database View
+                </button>
+              </div>
+
               <button
                 onClick={() => setShowLogs(false)}
                 className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-white/10 text-slate-400 hover:text-white transition-colors">
@@ -367,11 +386,16 @@ export default function DashboardPage() {
             </div>
 
             <div className="flex-1 overflow-y-auto p-0 bg-black/30 custom-scrollbar">
-              <LogTimeline logs={logs} />
+              {viewMode === 'timeline' ? (
+                <LogTimeline logs={logs} />
+              ) : (
+                <LogTable logs={logs} />
+              )}
             </div>
           </div>
         </div>
       )}
+
 
       {/* Resume Modal */}
       {showResumeModal && (

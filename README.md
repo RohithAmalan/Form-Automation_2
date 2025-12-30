@@ -1,23 +1,39 @@
 # Intelligent Form Automation (Full-Stack)
 
-A robust, AI-powered form automation agent featuring **Human-in-the-Loop (HITL)** capabilities. The system uses a **Next.js Frontend** for control and a **Node.js/Express Backend** with **Playwright** for automation, backed by **PostgreSQL**.
+A robust, AI-powered form automation agent featuring **Human-in-the-Loop (HITL)** capabilities, a production-grade **Job Queue**, and deep system observability. The system uses a **Next.js Frontend** for control and a **Node.js/Express Backend** with **Playwright** for automation, backed by **PostgreSQL**.
+
+> **Pro Agent**: Capable of learning from profile data, handling file uploads, and intelligently recovering from failures.
 
 ## 🚀 Key Features
 
+### 🤖 Automation & Intelligence
 *   **Human-in-the-Loop (HITL)**: Intelligently pauses when data is missing (e.g., File Uploads, specific text fields) and waits for user input via the dashboard.
-*   **📂 Smart File Handling (New)**: Support for **Multiple File Uploads**. The AI intelligently selects the correct file from your upload list for specific fields (e.g., Resume vs. Cover Letter).
-*   **⚡ Quick Replay & Caching (New)**: Automatically caches successful form actions. Re-run complex forms in seconds with the **Quick Replay** sidebar.
-*   **📝 Organize History (New)**: Rename or Delete your Quick Replay templates to keep your workspace clean.
+*   **📂 Smart File Handling**: Support for **Multiple File Uploads**. The AI intelligently selects the correct file from your upload list for specific fields (e.g., Resume vs. Cover Letter).
+*   **⚡ Quick Replay & Caching**: Automatically caches successful form actions. Re-run complex forms in seconds with the **Quick Replay** sidebar.
 *   **🧠 Profile Learning**: Automatically learns from your inputs. If you provide information once (e.g., "Address Line 2"), it saves it to your profile and never asks again.
-*   **Full-Stack Dashboard**: Real-time status, logs, and interaction UI with a professional, icon-based aesthetic.
+
+### ⚙️ Robust Job Backend
+*   **Queue Architecture**: Implements a generic Producer-Consumer job queue with PostgreSQL (`SKIP LOCKED`) for concurrency safety.
+*   **Retry Logic**: Automatically retries failed jobs once before marking them as `DEAD`.
+*   **Lifecycle Management**: Full state tracking: `PENDING` → `PROCESSING` → `PAUSED` → `COMPLETED` / `FAILED`.
+*   **Manual Control**: Pause, Resume, or Cancel jobs directly from the UI.
+
+### 📊 Observability
+*   **Live Dashboard**: Real-time status, timeline visualization of every action.
+*   **Database View Logs**: Switch between visual timelines and raw database logs for deep debugging.
+*   **Global System Logs**: Unified stream of all agent activities across the platform.
+
+---
 
 ## 🛠️ Tech Stack
 
-*   **Frontend**: Next.js, React, Tailwind CSS
-*   **Backend**: Node.js, Express, TypeScript
-*   **Automation**: Playwright, OpenAI (GPT-4o/Gemini via OpenRouter)
-*   **Database**: PostgreSQL
-*   **Process Management**: Concurrently (run both servers with one command)
+*   **Frontend**: Next.js 15, React 19, Tailwind CSS, Lucide Icons
+*   **Backend**: Node.js, Express, TypeScript, Playwright
+*   **AI**: OpenAI (GPT-4o) / Google Gemini (via OpenRouter)
+*   **Database**: PostgreSQL (with `pg` and `uuid-ossp`)
+*   **Process Management**: Concurrently
+
+---
 
 ## 📦 Setup & Installation
 
@@ -29,10 +45,10 @@ A robust, AI-powered form automation agent featuring **Human-in-the-Loop (HITL)*
 
 2.  **Install Dependencies**:
     ```bash
-    # Install Root/Backend dependencies
+    # Root & Backend
     npm install
     
-    # Install Frontend dependencies
+    # Frontend
     cd frontend && npm install && cd ..
     ```
 
@@ -41,7 +57,8 @@ A robust, AI-powered form automation agent featuring **Human-in-the-Loop (HITL)*
     ```env
     PORT=3001
     DATABASE_URL=postgresql://postgres:password@localhost:5432/form_automation_v2
-    OPENROUTER_API_KEY=sk-or-your-key-here
+    OPENROUTER_API_KEY=sk-your-key
+    SESSION_SECRET=dev_secret
     ```
 
 4.  **Database Setup**:
@@ -49,6 +66,8 @@ A robust, AI-powered form automation agent featuring **Human-in-the-Loop (HITL)*
     ```bash
     npx ts-node backend/src/scripts/init_db.ts
     ```
+
+---
 
 ## 🏃‍♂️ Usage
 
@@ -59,24 +78,33 @@ A robust, AI-powered form automation agent featuring **Human-in-the-Loop (HITL)*
 *   **Dashboard**: `http://localhost:3000`
 *   **API**: `http://localhost:3001`
 
-### Workflow
-1.  **Submit a Job**: Enter a Form URL in the dashboard.
-2.  **Monitor**: Watch real-time logs and status.
-3.  **Handle Pauses**:
-    *   If the bot misses a field (e.g., "Proposal Title") or needs a file, the status changes to **⚠️ NEED INPUT**.
-    *   Click **RESUME**.
-    *   Enter the value or upload the file in the popup.
-    *   The bot resumes and completes the form.
+### Queue Workflow
+The system follows a strict state machine:
+```mermaid
+graph TD
+    Start([queue.add()]) --> PENDING
+    PENDING --> PROCESSING
+    PROCESSING --> COMPLETED
+    PROCESSING --> FAILED
+    FAILED --> CheckRetry{Retries < 1?}
+    CheckRetry -- Yes --> PENDING
+    CheckRetry -- No --> DEAD
+    
+    PROCESSING -.-> PAUSED
+    PAUSED -.-> PROCESSING
+```
+
+---
 
 ## 📁 Project Structure
 
-*   `frontend/`: Next.js React Application (Dashboard, Modals).
+*   `frontend/`: Next.js React Application (Logs, Dashboard, Sidebar).
 *   `backend/src/`:
-    *   `automation/`: Core Playwright logic & AI Prompts.
-    *   `controllers/` & `routes/`: API endpoints.
-    *   `models/`: DB interaction (Jobs, Profiles, Logs).
-    *   `queue/`: Job processing worker.
-*   `database/`: SQL Schema.
+    *   `automation/`: Playwright logic & AI Prompts.
+    *   `queue/`: **Task Queue Worker** (Producer/Consumer logic).
+    *   `models/`: DB interaction (JobModel, LogModel).
+    *   `scripts/`: DB Init & Migrations.
+*   `database/`: SQL Schema & Migrations.
 
 ---
 *Built by Rohith Amalan*
